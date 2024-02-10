@@ -95,34 +95,29 @@ def tobs():
 # Return a JSON list of the minimum temperature, the average temperature, and the maximum temperature for a specified start or start-end range.
 # For a specified start, calculate TMIN, TAVG, and TMAX for all the dates greater than or equal to the start date.
 # For a specified start date and end date, calculate TMIN, TAVG, and TMAX for the dates from the start date to the end date, inclusive.
-@app.route("/api.v1.0/start/<start>")
-@app.route("/api.v1.0/start/<start>/<end>")
-def start_api(start=None, end=None):
-
-    try:
-        datetime.strptime(start, '%Y-%m-%d')
-        if end:
-            datetime.strptime(end, '%Y-%m-%d')
-    except ValueError:
-        return jsonify({"error": "Invalid date format. Please use YYYY-MM-DD format."}), 400
-
-    sel = [
-        func.min(Measurements.tobs).label('TMIN'), 
-        func.max(Measurements.tobs).label('TAVG'), 
-        func.avg(Measurements.tobs).label('TMAX')
-    ]
-
+@app.route("/api/v1.0/temp/<start>")
+@app.route("/api/v1.0/temp/<start>/<end>")
+def stats(start=None, end=None):
+    """Return TMIN, TAVG, TMAX."""
+    # Select statement
+    sel = [func.min(Measurements.tobs), func.avg(Measurements.tobs), func.max(Measurements.tobs)]
     if not end:
-        start_query = session.query(*sel).filter(Measurements.date >= start).all()
+        start = dt.datetime.strptime(start, "%m%d%Y")
+        results = session.query(*sel).\
+            filter(Measurements.date >= start).all()
         session.close()
-        start_data = list(np.ravel(start_query))
-        return jsonify(start_data)
-    
-    start_query = session.query(*sel).filter(Measurements.date >= start).filter(Measurements.date <= end).all()
+        temps = list(np.ravel(results))
+        return jsonify(temps)
+    # calculate TMIN, TAVG, TMAX with start and stop
+    start = dt.datetime.strptime(start, "%m%d%Y")
+    end = dt.datetime.strptime(end, "%m%d%Y")
+    results = session.query(*sel).\
+        filter(Measurements.date >= start).\
+        filter(Measurements.date <= end).all()
     session.close()
-    start_data = list(np.ravel(start_query))
-    return jsonify(start_data)
-    
+    # Unravel results into a 1D array and convert to a list
+    temps = list(np.ravel(results))
+    return jsonify(temps=temps)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
