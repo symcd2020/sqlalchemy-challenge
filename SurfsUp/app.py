@@ -49,8 +49,12 @@ def home():
         f"/api/v1.0/precipitation<br/>"
         f"/api/v1.0/stations<br/>"
         f"/api/v1.0/tobs<br/>"
-        f"/api/v1.0/<start><br/>"
-        f"/api/v1.0/<start>/<end><br/>"
+        "<br/>"
+        f"To retrieve the minimum, average, and maximum temperatures for a specific start date, use (replace start date in yyyy-mm-dd format):<br/>"
+        f"/api/v1.0/yyyy-mm-dd<br/>"
+        "<br/>"
+        f"To retrieve the minimum, average, and maximum temperatures for a specific start-end range, use (replace start and end date in yyyy-mm-dd format):<br/>"
+        f"/api/v1.0/yyyy-mm-dd/yyyy-mm-dd<br/>"
     )
     
 # Convert the query results from your precipitation analysis (i.e. retrieve only the last 12 months of data) to a dictionary using date as the key and prcp as the value. 
@@ -95,29 +99,37 @@ def tobs():
 # Return a JSON list of the minimum temperature, the average temperature, and the maximum temperature for a specified start or start-end range.
 # For a specified start, calculate TMIN, TAVG, and TMAX for all the dates greater than or equal to the start date.
 # For a specified start date and end date, calculate TMIN, TAVG, and TMAX for the dates from the start date to the end date, inclusive.
-@app.route("/api/v1.0/temp/<start>")
-@app.route("/api/v1.0/temp/<start>/<end>")
-def stats(start=None, end=None):
-    """Return TMIN, TAVG, TMAX."""
-    # Select statement
-    sel = [func.min(Measurements.tobs), func.avg(Measurements.tobs), func.max(Measurements.tobs)]
-    if not end:
-        start = dt.datetime.strptime(start, "%m%d%Y")
-        results = session.query(*sel).\
-            filter(Measurements.date >= start).all()
-        session.close()
-        temps = list(np.ravel(results))
-        return jsonify(temps)
-    # calculate TMIN, TAVG, TMAX with start and stop
-    start = dt.datetime.strptime(start, "%m%d%Y")
-    end = dt.datetime.strptime(end, "%m%d%Y")
-    results = session.query(*sel).\
-        filter(Measurements.date >= start).\
-        filter(Measurements.date <= end).all()
-    session.close()
-    # Unravel results into a 1D array and convert to a list
-    temps = list(np.ravel(results))
-    return jsonify(temps=temps)
+@app.route("/api/v1.0/<start>")
+@app.route("/api/v1.0/<start>/<end>")
+def cal_temp(start=None, end=None):
+    # Create the session
+    session = Session(engine)
+    
+    # Make a list to query (the minimum, average and maximum temperature)
+    sel=[func.min(Measurements.tobs), func.avg(Measurements.tobs), func.max(Measurements.tobs)]
+    
+    # Check if there is an end date then do the task accordingly
+    if end == None: 
+        # Query the data from start date to the most recent date
+        start_data = session.query(*sel).\
+                            filter(Measurements.date >= start).all()
+        # Convert list of tuples into normal list
+        start_list = list(np.ravel(start_data))
+
+        # Return a list of jsonified minimum, average and maximum temperatures for a specific start date
+        return jsonify(start_list)
+    else:
+        # Query the data from start date to the end date
+        start_end_data = session.query(*sel).\
+                            filter(Measurements.date >= start).\
+                            filter(Measurements.date <= end).all()
+        # Convert list of tuples into normal list
+        start_end_list = list(np.ravel(start_end_data))
+
+        # Return a list of jsonified minimum, average and maximum temperatures for a specific start-end date range
+        return jsonify(start_end_list)
+
+
 
 if __name__ == '__main__':
     app.run()
